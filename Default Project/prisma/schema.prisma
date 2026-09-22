@@ -1,0 +1,287 @@
+// Prisma Schema — SQLite marketplace database.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "sqlite"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum SellerStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ProductStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+  SOLD_OUT
+  INACTIVE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// User & Seller models
+// ---------------------------------------------------------------------------
+
+model User {
+  id           Int      @id @default(autoincrement())
+  telegramId   BigInt   @unique
+  username     String?
+  firstName    String
+  lastName     String?
+  phone        String?
+  location     String?
+  role         Role     @default(BUYER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sellerProfile    SellerProfile?
+  applications     SellerApplication[]
+  cart             Cart?
+  checkoutGroups   CheckoutGroup[]
+  orders           Order[]            @relation("BuyerOrders")
+  auditLogs        AuditLog[]
+
+  @@index([role])
+}
+
+model SellerProfile {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @unique
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName    String
+  description String?
+  location    String?
+  phone       String?
+  logoFileId  String?
+  status      SellerStatus @default(ACTIVE)
+  approved    Boolean      @default(false)
+  rating      Float        @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  products Product[]
+  orders   Order[]    @relation("SellerOrders")
+
+  @@index([status])
+}
+
+model SellerApplication {
+  id              Int               @id @default(autoincrement())
+  userId          Int
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName        String
+  description     String?
+  phone           String?
+  location        String?
+  status          ApplicationStatus @default(PENDING)
+  rejectionReason String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  emoji       String?
+  description String?
+  createdAt   DateTime  @default(now())
+
+  products Product[]
+}
+
+model Product {
+  id              Int           @id @default(autoincrement())
+  sellerId        Int
+  seller          SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  categoryId      Int
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name            String
+  description     String?
+  price           Float
+  currency        String        @default("ETB")
+  stock           Int           @default(0)
+  status          ProductStatus @default(PENDING)
+  rejectionReason String?
+  imageUrl        String?
+  location        String?
+  deliveryInfo    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  images     ProductImage[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@index([sellerId, status])
+  @@index([categoryId, status])
+  @@index([status])
+}
+
+model ProductImage {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  telegramFileId  String
+  caption         String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
+// Cart
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items CartItem[]
+
+  @@index([userId])
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cartId    Int
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model CheckoutGroup {
+  id          Int      @id @default(autoincrement())
+  buyerId     Int
+  buyer       User     @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  totalAmount Float
+  createdAt   DateTime @default(now())
+
+  orders Order[]
+
+  @@index([buyerId])
+}
+
+model Order {
+  id              Int        @id @default(autoincrement())
+  orderNumber     String     @unique
+  buyerId         Int
+  buyer           User       @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
+  sellerId        Int
+  seller          SellerProfile @relation("SellerOrders", fields: [sellerId], references: [id])
+  checkoutGroupId Int
+  checkoutGroup   CheckoutGroup @relation(fields: [checkoutGroupId], references: [id], onDelete: Cascade)
+  totalAmount     Float
+  currency        String     @default("ETB")
+  status          OrderStatus @default(PENDING)
+  deliveryLocation String?
+  buyerPhone      String?
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productName String
+  price       Float
+  currency    String   @default("ETB")
+  quantity    Int
+  subtotal    Float
+
+  @@index([orderId])
+}
+
+model OrderStatusHistory {
+  id        Int         @id @default(autoincrement())
+  orderId   Int
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  oldStatus OrderStatus
+  newStatus OrderStatus
+  changedBy String
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

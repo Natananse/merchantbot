@@ -1,0 +1,44 @@
+{
+  "name": "merchant-bot",
+  "version": "1.0.0",
+  "description": "A complete Telegram merchant marketplace bot (buyers, sellers, orders, admin) built with Node.js, Telegraf, Prisma and SQLite.",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "db:push": "prisma db push",
+    "db:seed": "node src/database/seed.js",
+    "webhook:set": "node scripts/set-webhook.js",
+    "export:code": "node scripts/export-code.js",
+    "import:code": "node scripts/import-code.js",
+    "smoke": "sh -c 'DATABASE_URL=\"file:./smoke.db\" npx prisma db push --skip-generate >/dev/null 2>&1 && DATABASE_URL=\"file:./smoke.db\" node tests/smoke.js; rm -f prisma/smoke.db prisma/smoke.db-journal'",
+    "e2e": "sh -c 'DATABASE_URL=\"file:./e2e.db\" npx prisma db push --skip-generate >/dev/null 2>&1 && DATABASE_URL=\"file:./e2e.db\" node tests/e2e.js; rm -f prisma/e2e.db prisma/e2e.db-journal'"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "marketplace",
+    "ecommerce",
+    "prisma",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^6.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "prisma": "^6.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "prisma@6.19.3": true
+  }
+}
